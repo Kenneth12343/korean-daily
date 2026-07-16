@@ -1,8 +1,7 @@
 # Email config with password - DO NOT commit!
 email-config.json
 
-# Local progress
-progress.json
+# Progress is tracked in the cloud version
 
 # Logs
 logs/
