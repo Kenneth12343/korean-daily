@@ -28,7 +28,7 @@ PASSWORD = os.environ.get("QQ_MAIL_AUTH_CODE", "")
 
 
 def load_json(path):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8-sig") as f:
         return json.load(f)
 
 
