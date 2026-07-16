@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-TOPIK 4  Daily Korean Push - Cloud Email Sender
-Runs on GitHub Actions to send daily Korean learning emails via QQ Mail.
+TOPIK 4  Daily Korean Push - Cloud Email Sender (Enhanced)
+Runs on GitHub Actions. Sends: 5 vocab + 2 grammar + 1 expression + 1 reading
 """
 import json
 import random
@@ -17,13 +17,11 @@ SCRIPT_DIR = Path(__file__).parent
 DATA_DIR = SCRIPT_DIR / "data"
 PROGRESS_FILE = SCRIPT_DIR / "progress.json"
 
-# ── Email Config ──────────────────────────────
 SMTP_SERVER = "smtp.qq.com"
 SMTP_PORT = 587
 FROM_EMAIL = "524181692@qq.com"
 TO_EMAIL = "524181692@qq.com"
 USERNAME = "524181692@qq.com"
-# Password from environment variable (GitHub Secret)
 PASSWORD = os.environ.get("QQ_MAIL_AUTH_CODE", "")
 
 
@@ -44,6 +42,7 @@ def load_progress():
         "LearnedVocabulary": [],
         "LearnedGrammar": [],
         "LearnedExpressions": [],
+        "LearnedReadings": [],
         "StartDate": datetime.now().strftime("%Y-%m-%d"),
         "Streak": 0,
         "LastDate": "",
@@ -51,98 +50,172 @@ def load_progress():
     }
 
 
-def get_random_unlearned(items, learned_list):
-    """Select a random item that hasn't been learned yet."""
-    # Build keys depending on item type
+def get_random_unlearned(items, learned_list, count=1, key_field=None):
+    """Select N random unlearned items. If not enough unlearned, fill with random."""
     unlearned = []
     for item in items:
-        key = item.get("word") or item.get("grammar") or item.get("expression")
+        if key_field:
+            key = item.get(key_field, "")
+        else:
+            key = item.get("word") or item.get("grammar") or item.get("expression") or item.get("id", "")
         if key not in learned_list:
             unlearned.append(item)
 
-    if not unlearned:
-        return random.choice(items)
-    return random.choice(unlearned)
+    result = []
+    if len(unlearned) >= count:
+        result = random.sample(unlearned, count)
+    else:
+        result = unlearned[:]
+        remaining = count - len(result)
+        others = [i for i in items if i not in result]
+        if others:
+            result.extend(random.choices(others, k=min(remaining, len(others))))
+
+    return result
 
 
-def build_html_email(vocab, grammar, expr, progress):
-    """Build a beautiful HTML email."""
+def build_vocab_card(v):
+    """Build HTML for one vocab item."""
+    return f"""<div style="padding:8px 0;border-bottom:1px dashed #eee">
+<span style="font-size:18px;font-weight:bold;color:#1565c0">{v['word']}</span>
+<span style="font-size:14px;color:#555;margin-left:8px">{v['meaning']}</span>
+<span style="font-size:11px;color:#999;margin-left:8px">[{v['pos']}] L{v['level']}</span>
+<div style="font-size:12px;color:#666;margin-top:2px">例: {v['example']}</div>
+<div style="font-size:11px;color:#aaa">→ {v['example_cn']}</div>
+</div>"""
+
+
+def build_grammar_card(g):
+    """Build HTML for one grammar item."""
+    return f"""<div style="padding:8px 0;border-bottom:1px dashed #eee">
+<span style="font-size:18px;font-weight:bold;color:#c62828">{g['grammar']}</span>
+<span style="font-size:14px;color:#555;margin-left:8px">{g['meaning']}</span>
+<span style="font-size:11px;color:#999;margin-left:8px">L{g['level']}</span>
+<div style="font-size:12px;color:#666;margin-top:2px"><b>用法:</b> {g['usage']}</div>
+<div style="font-size:12px;color:#666">例: {g['example']}</div>
+<div style="font-size:11px;color:#aaa">→ {g['example_cn']}</div>
+</div>"""
+
+
+def build_reading_card(r):
+    """Build HTML for a reading passage."""
+    questions_html = ""
+    for q in r.get("questions", []):
+        opts = "  |  ".join([f"{i+1}. {o}" for i, o in enumerate(q.get("options", []))])
+        questions_html += f"""<div style="background:#fafafa;padding:8px 12px;margin:6px 0;border-radius:6px">
+<div style="font-size:13px;color:#333;font-weight:bold">❓ {q['question']}</div>
+<div style="font-size:12px;color:#999;margin-top:4px">{opts}</div>
+<div style="font-size:11px;color:#2e7d32;margin-top:2px">✓ 答案: {q['options'][q['answer']]}</div>
+</div>"""
+    return f"""<div style="padding:10px 0">
+<div style="font-size:13px;color:#444;line-height:1.8;background:#fafafa;padding:12px;border-radius:8px;border-left:3px solid #667eea">
+<b>📖 {r['title']}</b> <span style="color:#999;font-size:11px">TOPIK L{r['level']}</span><br><br>
+{r['passage']}
+</div>
+<div style="font-size:11px;color:#aaa;margin-top:4px">→ {r['passage_cn']}</div>
+{questions_html}
+</div>"""
+
+
+def build_html_email(vocabs, grammars, expr, reading, progress):
+    """Build a rich daily HTML email."""
     today = datetime.now().strftime("%Y-%m-%d")
+    day_of_week = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"]
+    dow = day_of_week[datetime.now().weekday()]
     streak = progress.get("Streak", 0)
     vocab_count = len(progress.get("LearnedVocabulary", []))
     grammar_count = len(progress.get("LearnedGrammar", []))
     expr_count = len(progress.get("LearnedExpressions", []))
+
+    vocab_cards = "\n".join([build_vocab_card(v) for v in vocabs])
+    grammar_cards = "\n".join([build_grammar_card(g) for g in grammars])
+    reading_html = build_reading_card(reading)
+
+    # Calculate progress toward TOPIK 4
+    vocab_pct = min(100, round(vocab_count / 450 * 100))
+    grammar_pct = min(100, round(grammar_count / 74 * 100))
 
     return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <style>
-body {{ font-family: 'Segoe UI', 'Microsoft YaHei', 'Malgun Gothic', sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }}
-.card {{ max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }}
-.header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }}
-.header h1 {{ margin: 0; font-size: 24px; }}
-.header p {{ margin: 8px 0 0; opacity: 0.9; font-size: 14px; }}
-.stats {{ display: flex; justify-content: space-around; padding: 16px; background: #fafafa; border-bottom: 1px solid #eee; }}
-.stat {{ text-align: center; }}
-.stat .num {{ font-size: 22px; font-weight: bold; color: #667eea; }}
-.stat .label {{ font-size: 12px; color: #999; margin-top: 4px; }}
-.section {{ padding: 20px 24px; border-bottom: 1px solid #f0f0f0; }}
-.section .tag {{ display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; margin-bottom: 8px; }}
-.tag-vocab {{ background: #e3f2fd; color: #1565c0; }}
-.tag-grammar {{ background: #fce4ec; color: #c62828; }}
-.tag-expr {{ background: #e8f5e9; color: #2e7d32; }}
-.section .main {{ font-size: 22px; font-weight: bold; color: #333; margin: 6px 0; }}
-.section .meaning {{ font-size: 16px; color: #555; margin: 4px 0; }}
-.section .meta {{ font-size: 12px; color: #999; margin: 4px 0; }}
-.section .example {{ background: #fafafa; padding: 10px 14px; border-left: 3px solid #667eea; margin: 10px 0; border-radius: 0 6px 6px 0; font-size: 14px; color: #444; }}
-.section .example-cn {{ font-size: 12px; color: #888; margin-top: 4px; }}
-.motto {{ background: #fff9e6; padding: 20px 24px; text-align: center; border-top: 1px solid #f0f0f0; }}
-.motto .kr {{ font-size: 16px; color: #b8860b; font-style: italic; }}
-.motto .cn {{ font-size: 13px; color: #999; margin-top: 4px; }}
-.footer {{ text-align: center; padding: 16px; font-size: 11px; color: #bbb; }}
-.footer a {{ color: #667eea; text-decoration: none; }}
+body {{ font-family: 'Segoe UI','Microsoft YaHei','Malgun Gothic',sans-serif; background:#f5f5f5; margin:0; padding:20px; }}
+.card {{ max-width:620px; margin:0 auto; background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.1); }}
+.header {{ background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:white; padding:24px; text-align:center; }}
+.header h1 {{ margin:0; font-size:22px; }}
+.header p {{ margin:6px 0 0; opacity:0.9; font-size:13px; }}
+.stats {{ display:flex; justify-content:space-around; padding:14px; background:#fafafa; border-bottom:1px solid #eee; }}
+.stat {{ text-align:center; }}
+.stat .num {{ font-size:20px; font-weight:bold; color:#667eea; }}
+.stat .label {{ font-size:11px; color:#999; margin-top:2px; }}
+.bar-wrap {{ background:#e0e0e0; border-radius:4px; height:6px; margin-top:4px; width:60px; margin-left:auto;margin-right:auto; }}
+.bar-fill {{ background:#667eea; border-radius:4px; height:6px; }}
+.section {{ padding:16px 20px; border-bottom:1px solid #f0f0f0; }}
+.section .tag {{ display:inline-block; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:bold; margin-bottom:10px; }}
+.tag-vocab {{ background:#e3f2fd; color:#1565c0; }}
+.tag-grammar {{ background:#fce4ec; color:#c62828; }}
+.tag-expr {{ background:#e8f5e9; color:#2e7d32; }}
+.tag-reading {{ background:#fff3e0; color:#e65100; }}
+.expr-main {{ font-size:20px; font-weight:bold; color:#333; margin:6px 0; }}
+.motto {{ background:#fff9e6; padding:16px 20px; text-align:center; border-top:1px solid #f0f0f0; }}
+.motto .kr {{ font-size:15px; color:#b8860b; font-style:italic; }}
+.motto .cn {{ font-size:12px; color:#999; margin-top:4px; }}
+.footer {{ text-align:center; padding:14px; font-size:10px; color:#bbb; }}
 </style>
 </head>
 <body>
 <div class="card">
 <div class="header">
-<h1>🇰🇷 오늘의 한국어 | TODAY KOREAN</h1>
-<p>{today} | 오늘도 화이팅!</p>
+<h1>🇰🇷 오늘의 한국어 | TOPIK 4 DAILY</h1>
+<p>{today} ({dow}) | 연속 {streak}일째 | 오늘도 화이팅!</p>
 </div>
 <div class="stats">
-<div class="stat"><div class="num">{streak}</div><div class="label">DAY STREAK</div></div>
-<div class="stat"><div class="num">{vocab_count}</div><div class="label">VOCAB</div></div>
-<div class="stat"><div class="num">{grammar_count}</div><div class="label">GRAMMAR</div></div>
-<div class="stat"><div class="num">{expr_count}</div><div class="label">EXPRESSIONS</div></div>
+<div class="stat">
+<div class="num">{streak}</div><div class="label">连续天数</div>
 </div>
+<div class="stat">
+<div class="num">{vocab_count}</div><div class="label">累计词汇</div>
+<div class="bar-wrap"><div class="bar-fill" style="width:{vocab_pct}%"></div></div>
+</div>
+<div class="stat">
+<div class="num">{grammar_count}</div><div class="label">累计语法</div>
+<div class="bar-wrap"><div class="bar-fill" style="width:{grammar_pct}%"></div></div>
+</div>
+<div class="stat">
+<div class="num">{expr_count}</div><div class="label">累计表达</div>
+</div>
+</div>
+
 <div class="section">
-<span class="tag tag-vocab">📝 VOCABULARY</span>
-<div class="main">{vocab['word']}</div>
-<div class="meaning">{vocab['meaning']}</div>
-<div class="meta">{vocab['pos']} | TOPIK LEVEL {vocab['level']}</div>
-<div class="example">{vocab['example']}<div class="example-cn">➜ {vocab['example_cn']}</div></div>
+<span class="tag tag-vocab">📝 오늘의 어휘 (今日词汇 x5)</span>
+{vocab_cards}
 </div>
+
 <div class="section">
-<span class="tag tag-grammar">📐 GRAMMAR</span>
-<div class="main">{grammar['grammar']}</div>
-<div class="meaning">{grammar['meaning']}</div>
-<div class="meta">{grammar['usage']}</div>
-<div class="example">{grammar['example']}<div class="example-cn">➜ {grammar['example_cn']}</div></div>
+<span class="tag tag-grammar">📐 오늘의 문법 (今日语法 x2)</span>
+{grammar_cards}
 </div>
+
 <div class="section">
-<span class="tag tag-expr">🗣️ EXPRESSION</span>
-<div class="main">{expr['expression']}</div>
-<div class="meaning">{expr['meaning']}</div>
-<div class="meta">{expr['context']} | {expr['pronunciation']}</div>
+<span class="tag tag-expr">🗣️ 오늘의 표현 (今日表达)</span>
+<div class="expr-main">{expr['expression']}</div>
+<div style="font-size:15px;color:#555;margin:4px 0">{expr['meaning']}</div>
+<div style="font-size:12px;color:#999">{expr['context']}</div>
+<div style="font-size:12px;color:#888">发音: {expr['pronunciation']}</div>
 </div>
+
+<div class="section">
+<span class="tag tag-reading">📖 오늘의 읽기 (今日阅读)</span>
+{reading_html}
+</div>
+
 <div class="motto">
-<div class="kr">끊임없이 노력하는 사람만이 목표에 도달할 수 있다</div>
-<div class="cn">只有不断努力的人才能达到目标 | NEVER GIVE UP, YOU WILL REACH TOPIK 4!</div>
+<div class="kr">"끊임없이 노력하는 사람만이 목표에 도달할 수 있다"</div>
+<div class="cn">只有不断努力的人才能达到目标 | 3个月拿下TOPIK 4! 💪</div>
 </div>
 <div class="footer">
-TOPIK 4 Daily Korean Push System<br>
-Powered by GitHub Actions - Runs every day at 08:00 UTC
+TOPIK 4 Daily Korean Push · 每日08:00自动推送 · Powered by GitHub Actions
 </div>
 </div>
 </body>
@@ -150,9 +223,8 @@ Powered by GitHub Actions - Runs every day at 08:00 UTC
 
 
 def send_email(html_body, subject):
-    """Send email via QQ Mail SMTP."""
     if not PASSWORD:
-        print("[ERROR] QQ_MAIL_AUTH_CODE not set in environment!")
+        print("[ERROR] QQ_MAIL_AUTH_CODE not set!")
         sys.exit(1)
 
     msg = MIMEMultipart("alternative")
@@ -177,35 +249,42 @@ def send_email(html_body, subject):
 
 def main():
     print("=" * 50)
-    print("  TOPIK 4 DAILY KOREAN PUSH (CLOUD)")
+    print("  TOPIK 4 DAILY KOREAN PUSH (ENHANCED)")
+    print("  5 Vocab + 2 Grammar + 1 Expression + 1 Reading")
     print("=" * 50)
 
-    # Load data
     vocabulary = load_json(DATA_DIR / "vocabulary.json")
     grammar = load_json(DATA_DIR / "grammar.json")
     expressions = load_json(DATA_DIR / "expressions.json")
+    readings = load_json(DATA_DIR / "reading_passages.json")
 
-    print(f"Loaded: {len(vocabulary)} vocab, {len(grammar)} grammar, {len(expressions)} expressions")
+    print(f"Loaded: {len(vocabulary)} vocab, {len(grammar)} grammar, "
+          f"{len(expressions)} expressions, {len(readings)} readings")
 
-    # Load progress
     progress = load_progress()
-
     today = datetime.now().strftime("%Y-%m-%d")
     is_today_done = progress.get("LastDate") == today
 
-    # Select today's content
-    vocab = get_random_unlearned(vocabulary, progress.get("LearnedVocabulary", []))
-    gram = get_random_unlearned(grammar, progress.get("LearnedGrammar", []))
-    expr = get_random_unlearned(expressions, progress.get("LearnedExpressions", []))
+    # Select content
+    vocabs = get_random_unlearned(vocabulary, progress.get("LearnedVocabulary", []),
+                                  count=5, key_field="word")
+    grams = get_random_unlearned(grammar, progress.get("LearnedGrammar", []),
+                                 count=2, key_field="grammar")
+    expr = get_random_unlearned(expressions, progress.get("LearnedExpressions", []),
+                                count=1, key_field="expression")[0]
+    reading = get_random_unlearned(readings, progress.get("LearnedReadings", []),
+                                   count=1, key_field="id")[0]
 
     # Update progress
     if not is_today_done:
-        progress["LearnedVocabulary"].append(vocab["word"])
-        progress["LearnedGrammar"].append(gram["grammar"])
+        for v in vocabs:
+            progress["LearnedVocabulary"].append(v["word"])
+        for g in grams:
+            progress["LearnedGrammar"].append(g["grammar"])
         progress["LearnedExpressions"].append(expr["expression"])
+        progress["LearnedReadings"].append(reading["id"])
         progress["LastDate"] = today
 
-        # Calculate streak
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         prev_date = progress.get("_prevDate", "")
         if prev_date == yesterday or progress.get("Streak", 0) == 0:
@@ -214,19 +293,19 @@ def main():
             progress["Streak"] = 1
         progress["_prevDate"] = today
 
-    # Save progress
     save_json(PROGRESS_FILE, progress)
 
-    # Build email
-    subject = f"🇰🇷 TODAY KOREAN {today} | {vocab['word']} | {gram['grammar']} | STREAK {progress['Streak']} DAYS"
-    html = build_html_email(vocab, gram, expr, progress)
+    # Build and send
+    vocab_preview = "、".join([v["word"] for v in vocabs])
+    subject = (f"🇰🇷 TOPIK韩语 {today} | 词汇:{vocabs[0]['word']}等5个 "
+               f"| 语法:{grams[0]['grammar']} | 连续{progress['Streak']}天")
+    html = build_html_email(vocabs, grams, expr, reading, progress)
 
-    # Send
-    print(f"Today's vocab: {vocab['word']} ({vocab['meaning']})")
-    print(f"Today's grammar: {gram['grammar']} ({gram['meaning']})")
-    print(f"Today's expression: {expr['expression']} ({expr['meaning']})")
+    print(f"Vocab: {vocab_preview}")
+    print(f"Grammar: {grams[0]['grammar']}, {grams[1]['grammar']}")
+    print(f"Expression: {expr['expression']}")
+    print(f"Reading: {reading['title']}")
     print(f"Streak: {progress['Streak']} days")
-    print()
 
     send_email(html, subject)
     print("Done!")
