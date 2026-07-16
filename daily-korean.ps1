@@ -10,6 +10,9 @@
     .\daily-korean.ps1 -Quiz          # Quick daily quiz
     .\daily-korean.ps1 -Test          # Stage-based test
     .\daily-korean.ps1 -ShowAll       # Progress stats
+    .\daily-korean.ps1 -MockExam         # Full TOPIK mock exam
+    .\daily-korean.ps1 -Reading          # Practice reading comprehension
+    .\daily-korean.ps1 -Writing          # Get a writing prompt
     .\daily-korean.ps1 -SendMail -NoToast  # Email only, no popup
 #>
 
@@ -18,6 +21,9 @@ param(
     [switch]$Quiz,
     [switch]$Test,
     [int]$Stage = 0,
+    [switch]$MockExam,
+    [switch]$Reading,
+    [switch]$Writing,
     [switch]$SendMail,
     [switch]$NoToast
 )
@@ -174,6 +180,162 @@ if ($Test) {
 
     $progress | ConvertTo-Json -Depth 10 | Set-Content $ProgressFile -Encoding UTF8
     Write-Host ""
+    return
+}
+
+# =============================================
+# MOCK EXAM MODE
+# =============================================
+if ($MockExam) {
+    $testsData = Get-Content (Join-Path $DataDir "tests.json") -Encoding UTF8 | ConvertFrom-Json
+    $exam = $testsData.mock_exam
+
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host ("  TOPIK MOCK EXAM: " + $exam.name) -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host ("Questions : " + $exam.total_questions) -ForegroundColor Gray
+    Write-Host ("Time      : " + $exam.time_limit_minutes + " min") -ForegroundColor Gray
+    Write-Host ("Pass      : " + $exam.pass_score + "%") -ForegroundColor Gray
+    Write-Host ""
+
+    $score = 0
+    $total = $exam.questions.Count
+    $qNum = 1
+
+    foreach ($q in $exam.questions) {
+        $typeLabel = switch ($q.type) {
+            "vocab" { "[VOCAB]" }
+            "grammar" { "[GRAMMAR]" }
+            "reading" { "[READING]" }
+            "expression" { "[EXPRESSION]" }
+            default { "[Q]" }
+        }
+
+        Write-Host ("--- Q" + $qNum + "/" + $total + " " + $typeLabel + " ---") -ForegroundColor Yellow
+
+        if ($q.type -eq "reading" -and $q.passage) {
+            Write-Host ""
+            Write-Host $q.passage -ForegroundColor White
+            Write-Host ""
+        }
+
+        Write-Host $q.question -ForegroundColor White
+        Write-Host ""
+
+        for ($i = 0; $i -lt $q.options.Count; $i++) {
+            Write-Host ("  [" + ($i + 1) + "] " + $q.options[$i]) -ForegroundColor Gray
+        }
+        Write-Host ""
+
+        $answer = Read-Host "Your answer (1-4)"
+        try { $answerIdx = [int]$answer - 1 } catch { $answerIdx = -1 }
+
+        if ($answerIdx -eq $q.answer) {
+            Write-Host "  >> CORRECT!" -ForegroundColor Green
+            $score++
+        } else {
+            Write-Host ("  >> WRONG! Answer: " + ($q.answer + 1)) -ForegroundColor Red
+            if ($q.explanation) { Write-Host ("  >> " + $q.explanation) -ForegroundColor DarkYellow }
+        }
+        Write-Host ""
+        $qNum++
+    }
+
+    $percent = [math]::Round(($score / $total) * 100)
+    $passed = ($percent -ge $exam.pass_score)
+
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host "  MOCK EXAM RESULTS" -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host ("Score : " + $score + "/" + $total + " (" + $percent + "%)") -ForegroundColor $(if ($passed) { "Green" } else { "Red" })
+    Write-Host ("Pass  : " + $exam.pass_score + "%") -ForegroundColor Gray
+
+    if ($passed) {
+        Write-Host ""
+        Write-Host "  CONGRATULATIONS! " -ForegroundColor Green -NoNewline
+        Write-Host "You are ready for TOPIK 4!" -ForegroundColor White
+    } else {
+        Write-Host ""
+        Write-Host "  Keep studying! Review the wrong answers." -ForegroundColor Yellow
+    }
+    Write-Host ""
+
+    # Save to test history
+    if (Test-Path $ProgressFile) { $progress = Get-Content $ProgressFile -Encoding UTF8 | ConvertFrom-Json } else { $progress = @{ TestHistory = @() } }
+    $examResult = @{ Date = (Get-Date -Format "yyyy-MM-dd HH:mm"); Stage = 0; StageName = $exam.name; Score = $score; Total = $total; Percent = $percent; Passed = $passed }
+    if (-not $progress.TestHistory) { $progress.TestHistory = @() }
+    $progress.TestHistory += $examResult
+    $progress | ConvertTo-Json -Depth 10 | Set-Content $ProgressFile -Encoding UTF8
+    return
+}
+
+# =============================================
+# READING PRACTICE MODE
+# =============================================
+if ($Reading) {
+    $passages = Get-Content (Join-Path $DataDir "reading_passages.json") -Encoding UTF8 | ConvertFrom-Json
+    $rp = $passages | Get-Random
+
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ("  READING PRACTICE | " + $rp.topic) -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ("Title : " + $rp.title + "  |  TOPIK Level: " + $rp.level) -ForegroundColor Gray
+    Write-Host ""
+    Write-Host $rp.passage -ForegroundColor White
+    Write-Host ("  -> " + $rp.passage_cn) -ForegroundColor DarkGray
+    Write-Host ""
+
+    foreach ($q in $rp.questions) {
+        Write-Host ("Q: " + $q.question) -ForegroundColor Yellow
+        Write-Host ""
+        for ($i = 0; $i -lt $q.options.Count; $i++) {
+            Write-Host ("  [" + ($i + 1) + "] " + $q.options[$i]) -ForegroundColor Gray
+        }
+        Write-Host ""
+        $answer = Read-Host "Your answer (1-4)"
+        try { $ansIdx = [int]$answer - 1 } catch { $ansIdx = -1 }
+        if ($ansIdx -eq $q.answer) {
+            Write-Host "  >> CORRECT!" -ForegroundColor Green
+        } else {
+            Write-Host ("  >> Answer: " + ($q.answer + 1) + ". " + $q.options[$q.answer]) -ForegroundColor Red
+            if ($q.explanation) { Write-Host ("  >> " + $q.explanation) -ForegroundColor DarkYellow }
+        }
+        Write-Host ""
+    }
+    Write-Host "More reading: .\daily-korean.ps1 -Reading" -ForegroundColor DarkGray
+    return
+}
+
+# =============================================
+# WRITING PROMPT MODE
+# =============================================
+if ($Writing) {
+    $prompts = Get-Content (Join-Path $DataDir "writing_prompts.json") -Encoding UTF8 | ConvertFrom-Json
+    $wp = $prompts | Get-Random
+
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ("  WRITING PRACTICE | TOPIK Level " + $wp.level) -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host ("TOPIC : " + $wp.topic) -ForegroundColor Yellow
+    Write-Host ("       " + $wp.topic_cn) -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host ("PROMPT:") -ForegroundColor White
+    Write-Host $wp.prompt -ForegroundColor White
+    Write-Host ("  -> " + $wp.prompt_cn) -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host ("GUIDE WORDS: " + ($wp.guide_words -join ", ")) -ForegroundColor Gray
+    Write-Host ("            " + ($wp.guide_words_cn -join ", ")) -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host ("SAMPLE OPENING:") -ForegroundColor Cyan
+    Write-Host $wp.sample_opening -ForegroundColor Cyan
+    Write-Host ("  -> " + $wp.sample_opening_cn) -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "Try writing 300-600 characters using the guide words." -ForegroundColor Gray
+    Write-Host "More prompts: .\daily-korean.ps1 -Writing" -ForegroundColor DarkGray
     return
 }
 
