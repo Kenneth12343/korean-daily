@@ -1,0 +1,122 @@
+[
+  {
+    "expression": "오늘 하루도 화이팅!",
+    "meaning": "今天一天也加油！",
+    "context": "为对方打气时的常用语",
+    "pronunciation": "오늘 하루도 화이팅 [o-neul ha-ru-do hwa-i-ting]"
+  },
+  {
+    "expression": "수고하셨습니다",
+    "meaning": "辛苦了",
+    "context": "工作结束后对同事/同学说，非常常用",
+    "pronunciation": "수고하셨습니다 [su-go-ha-syeot-seum-ni-da]"
+  },
+  {
+    "expression": "별일 없으시죠?",
+    "meaning": "没什么事吧？/ 一切还好吗？",
+    "context": "日常问候，相当于 '一切还好吗'",
+    "pronunciation": "별일 없으시죠 [byeo-ril eop-seu-si-jyo]"
+  },
+  {
+    "expression": "잘 부탁드립니다",
+    "meaning": "请多关照",
+    "context": "初次见面或拜托别人时用",
+    "pronunciation": "잘 부탁드립니다 [jal bu-tak-deu-rim-ni-da]"
+  },
+  {
+    "expression": "괜찮아요. 신경 쓰지 마세요.",
+    "meaning": "没关系，别在意。",
+    "context": "安慰对方不要放在心上",
+    "pronunciation": "괜찮아요 [gwaen-cha-na-yo] 신경 쓰지 마세요 [sin-gyeong sseu-ji ma-se-yo]"
+  },
+  {
+    "expression": "천천히 드세요.",
+    "meaning": "请慢用。",
+    "context": "用餐时对对方说",
+    "pronunciation": "천천히 드세요 [cheon-cheon-hi deu-se-yo]"
+  },
+  {
+    "expression": "배고파 죽겠어요.",
+    "meaning": "饿死了。（口语）",
+    "context": "表达非常饿的夸张说法",
+    "pronunciation": "배고파 죽겠어요 [bae-go-pa juk-ge-sseo-yo]"
+  },
+  {
+    "expression": "눈 코 뜰 새 없이 바빠요.",
+    "meaning": "忙得不可开交。",
+    "context": "形容极其忙碌的惯用语",
+    "pronunciation": "눈 코 뜰 새 없이 바빠요 [nun ko tteul sae eop-si ba-ppa-yo]"
+  },
+  {
+    "expression": "제 생각에는...",
+    "meaning": "在我看来.../ 我觉得...",
+    "context": "表达自己观点时的开头",
+    "pronunciation": "제 생각에는 [je saeng-ga-ge-neun]"
+  },
+  {
+    "expression": "이해가 안 돼요.",
+    "meaning": "无法理解。/ 搞不懂。",
+    "context": "表示不理解某事",
+    "pronunciation": "이해가 안 돼요 [i-hae-ga an dwae-yo]"
+  },
+  {
+    "expression": "정말 대단하시네요!",
+    "meaning": "真了不起！/ 太厉害了！",
+    "context": "称赞别人时",
+    "pronunciation": "정말 대단하시네요 [jeong-mal dae-dan-ha-si-ne-yo]"
+  },
+  {
+    "expression": "오랜만이에요!",
+    "meaning": "好久不见！",
+    "context": "久别重逢时",
+    "pronunciation": "오랜만이에요 [o-raen-ma-ni-e-yo]"
+  },
+  {
+    "expression": "마음에 들어요.",
+    "meaning": "合我心意 / 我喜欢。",
+    "context": "表达对某物的喜爱",
+    "pronunciation": "마음에 들어요 [ma-eu-me deu-reo-yo]"
+  },
+  {
+    "expression": "기회가 되면 한번...",
+    "meaning": "有机会的话...",
+    "context": "提出未来邀约的常用开头",
+    "pronunciation": "기회가 되면 [gi-hoe-ga doe-myeon]"
+  },
+  {
+    "expression": "배워 두면 쓸모가 많아요.",
+    "meaning": "学了很有用。",
+    "context": "推荐学某样东西时说",
+    "pronunciation": "배워 두면 쓸모가 많아요 [bae-wo du-myeon sseul-mo-ga ma-na-yo]"
+  },
+  {
+    "expression": "말이 씨가 되다",
+    "meaning": "一语成谶 / 话成了种子",
+    "context": "说不好的话容易成真（韩国谚语）",
+    "pronunciation": "말이 씨가 되다 [ma-ri ssi-ga doe-da]"
+  },
+  {
+    "expression": "가는 날이 장날이다",
+    "meaning": "恰巧碰上了 / 无巧不成书",
+    "context": "韩国谚语，去的那天正好是集日（表示巧合）",
+    "pronunciation": "가는 날이 장날이다 [ga-neun na-ri jang-na-ri-da]"
+  },
+  {
+    "expression": "어떻게 지내세요?",
+    "meaning": "最近过得怎么样？",
+    "context": "日常问候",
+    "pronunciation": "어떻게 지내세요 [eo-tteo-ke ji-nae-se-yo]"
+  },
+  {
+    "expression": "도와주셔서 감사합니다.",
+    "meaning": "感谢您的帮助。",
+    "context": "表达感谢时",
+    "pronunciation": "도와주셔서 감사합니다 [do-wa-ju-syeo-seo gam-sa-ham-ni-da]"
+  },
+  {
+    "expression": "뭐 좀 물어봐도 될까요?",
+    "meaning": "可以问个问题吗？",
+    "context": "请教别人前的礼貌用语",
+    "pronunciation": "뭐 좀 물어봐도 될까요 [mwo jom mu-reo-bwa-do doel-kka-yo]"
+  }
+]

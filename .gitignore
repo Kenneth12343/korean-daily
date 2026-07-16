@@ -1,0 +1,12 @@
+# Email config with password - DO NOT commit!
+email-config.json
+
+# Local progress
+progress.json
+
+# Logs
+logs/
+
+# Python
+__pycache__/
+*.pyc
